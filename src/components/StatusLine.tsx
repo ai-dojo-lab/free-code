@@ -12,6 +12,7 @@ import { useMainLoopModel } from '../hooks/useMainLoopModel.js';
 import { type ReadonlySettings, useSettings } from '../hooks/useSettings.js';
 import { Ansi, Box, Text } from '../ink.js';
 import { getRawUtilization } from '../services/claudeAiLimits.js';
+import { isOpenAIModel } from '../services/openai/client.js';
 import type { Message } from '../types/message.js';
 import type { StatusLineCommandInput } from '../types/statusLine.js';
 import type { VimMode } from '../types/textInputTypes.js';
@@ -69,7 +70,7 @@ function buildStatusLineCommandInput(permissionMode: PermissionMode, exceeds200k
     }),
     model: {
       id: runtimeModel,
-      display_name: renderModelName(runtimeModel)
+      display_name: isOpenAIModel(runtimeModel) ? `${renderModelName(runtimeModel)} · OpenAI` : renderModelName(runtimeModel)
     },
     workspace: {
       current_dir: getCwd(),

@@ -33,6 +33,7 @@ import {
   logEvent,
 } from './services/analytics/index.js'
 import { getAdvisorUsage } from './utils/advisor.js'
+import { isOpenAIModel } from './services/openai/client.js'
 import {
   getCurrentProjectConfig,
   saveCurrentProjectConfig,
@@ -211,6 +212,7 @@ function formatModelUsage(): string {
 
   let result = 'Usage by model:'
   for (const [shortName, usage] of Object.entries(usageByShortName)) {
+    const provider = isOpenAIModel(shortName) ? 'OpenAI' : 'Anthropic'
     const usageString =
       `  ${formatNumber(usage.inputTokens)} input, ` +
       `${formatNumber(usage.outputTokens)} output, ` +
@@ -220,9 +222,27 @@ function formatModelUsage(): string {
         ? `, ${formatNumber(usage.webSearchRequests)} web search`
         : '') +
       ` (${formatCost(usage.costUSD)})`
-    result += `\n` + `${shortName}:`.padStart(21) + usageString
+    result +=
+      `\n` + `${`${shortName} [${provider}]`}:`.padStart(21) + usageString
   }
   return result
+}
+
+export function getProviderCostBreakdown(): {
+  anthropic: number
+  openai: number
+} {
+  const usage = getModelUsage()
+  let anthropic = 0
+  let openai = 0
+  for (const [model, modelUsage] of Object.entries(usage)) {
+    if (isOpenAIModel(model)) {
+      openai += modelUsage.costUSD
+    } else {
+      anthropic += modelUsage.costUSD
+    }
+  }
+  return { anthropic, openai }
 }
 
 export function formatTotalCost(): string {
@@ -233,9 +253,17 @@ export function formatTotalCost(): string {
       : '')
 
   const modelUsageDisplay = formatModelUsage()
+  const providerBreakdown = getProviderCostBreakdown()
+  const providerLines =
+    providerBreakdown.openai > 0 || providerBreakdown.anthropic > 0
+      ? `Anthropic subtotal:    ${formatCost(providerBreakdown.anthropic)}
+OpenAI subtotal:       ${formatCost(providerBreakdown.openai)}
+`
+      : ''
 
   return chalk.dim(
     `Total cost:            ${costDisplay}\n` +
+      providerLines +
       `Total duration (API):  ${formatDuration(getTotalAPIDuration())}
 Total duration (wall): ${formatDuration(getTotalDuration())}
 Total code changes:    ${getTotalLinesAdded()} ${getTotalLinesAdded() === 1 ? 'line' : 'lines'} added, ${getTotalLinesRemoved()} ${getTotalLinesRemoved() === 1 ? 'line' : 'lines'} removed

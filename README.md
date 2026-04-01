@@ -159,7 +159,26 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 # Or use Claude.ai OAuth
 ./cli /login
+
+# Or sign in with ChatGPT and use GPT/Codex models
+./cli /login-chatgpt
 ```
+
+### ChatGPT Login
+
+This fork also supports signing in with a local ChatGPT account and using GPT/Codex models from the terminal UI.
+
+- Run `/login-chatgpt` inside the CLI
+- Complete the browser login flow
+- Pick one of the GPT/Codex models your account can access
+- Use `/logout-chatgpt` to clear only the ChatGPT login without logging out of Anthropic
+
+Notes:
+
+- This flow uses the ChatGPT/Codex backend at `https://chatgpt.com/backend-api/codex`
+- It does **not** require an `OPENAI_API_KEY`
+- Available models depend on your ChatGPT/Codex entitlement
+- GPT usage is tracked separately in `/cost`, `/status`, and `/stats`
 
 ### Quick test
 

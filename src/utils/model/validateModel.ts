@@ -3,6 +3,8 @@ import { MODEL_ALIASES } from './aliases.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import { getAPIProvider } from './providers.js'
 import { sideQuery } from '../sideQuery.js'
+import { fetchAvailableModels, isOpenAIModel } from '../../services/openai/client.js'
+import { getAvailableOpenAIModels, getOpenAIAuth } from '../openaiAuth.js'
 import {
   NotFoundError,
   APIError,
@@ -46,7 +48,40 @@ export async function validateModel(
     return { valid: true }
   }
 
-  // Check cache first
+  if (isOpenAIModel(normalizedModel)) {
+    const auth = await getOpenAIAuth()
+    if (!auth) {
+      return {
+        valid: false,
+        error: 'Not logged in to ChatGPT. Run /login-chatgpt first.',
+      }
+    }
+
+    try {
+      const cachedModels = getAvailableOpenAIModels()
+      if (cachedModels.includes(normalizedModel)) {
+        return { valid: true }
+      }
+
+      const models = await fetchAvailableModels(auth)
+      const exists = models.some(model => model.id === normalizedModel)
+      if (exists) {
+        return { valid: true }
+      }
+      return {
+        valid: false,
+        error: `Model '${normalizedModel}' is not available for your ChatGPT account`,
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      return {
+        valid: false,
+        error: `Unable to validate ChatGPT model: ${errorMessage}`,
+      }
+    }
+  }
+
+  // Check cache first for non-ChatGPT models.
   if (validModelCache.has(normalizedModel)) {
     return { valid: true }
   }

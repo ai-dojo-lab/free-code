@@ -1,6 +1,8 @@
 import { getDirectConnectServerUrl, getSessionId } from '../bootstrap/state.js'
+import { isOpenAIModel } from '../services/openai/client.js'
 import { stringWidth } from '../ink/stringWidth.js'
 import type { LogOption } from '../types/logs.js'
+import { getOpenAIAccountInfo } from './openaiAuth.js'
 import { getSubscriptionName, isClaudeAISubscriber } from './auth.js'
 import { getCwd } from './cwd.js'
 import { getDisplayPath } from './file.js'
@@ -9,6 +11,7 @@ import {
   truncateToWidth,
   truncateToWidthNoEllipsis,
 } from './format.js'
+import { getMainLoopModel } from './model/model.js'
 import {
   getRecentReleaseNotes,
   getStoredChangelogFromMemory,
@@ -249,6 +252,7 @@ export function getLogoDisplayData(): {
   agentName: string | undefined
 } {
   const version = process.env.DEMO_VERSION ?? MACRO.VERSION
+  const currentModel = getMainLoopModel()
   const serverUrl = getDirectConnectServerUrl()
   const displayPath = process.env.DEMO_VERSION
     ? '/code/claude'
@@ -256,9 +260,11 @@ export function getLogoDisplayData(): {
   const cwd = serverUrl
     ? `${displayPath} in ${serverUrl.replace(/^https?:\/\//, '')}`
     : displayPath
-  const billingType = isClaudeAISubscriber()
-    ? getSubscriptionName()
-    : 'API Usage Billing'
+  const billingType = isOpenAIModel(currentModel)
+    ? 'ChatGPT'
+    : isClaudeAISubscriber()
+      ? getSubscriptionName()
+      : 'API Usage Billing'
   const agentName = getInitialSettings().agent
 
   return {

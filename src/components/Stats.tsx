@@ -6,6 +6,7 @@ import figures from 'figures';
 import React, { Suspense, use, useCallback, useEffect, useMemo, useState } from 'react';
 import stripAnsi from 'strip-ansi';
 import type { CommandResultDisplay } from '../commands.js';
+import { formatCost } from '../cost-tracker.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { applyColor } from '../ink/colorize.js';
 import { stringWidth as getStringWidth } from '../ink/stringWidth.js';
@@ -17,6 +18,7 @@ import { getGlobalConfig } from '../utils/config.js';
 import { formatDuration, formatNumber } from '../utils/format.js';
 import { generateHeatmap } from '../utils/heatmap.js';
 import { renderModelName } from '../utils/model/model.js';
+import { isOpenAIModel } from '../services/openai/client.js';
 import { copyAnsiToClipboard } from '../utils/screenshotClipboard.js';
 import { aggregateClaudeCodeStatsForRange, type ClaudeCodeStats, type DailyModelTokens, type StatsDateRange } from '../utils/stats.js';
 import { resolveThemeSetting } from '../utils/systemTheme.js';
@@ -30,6 +32,10 @@ function formatPeakDay(dateStr: string): string {
     month: 'short',
     day: 'numeric'
   });
+}
+
+function getProviderLabel(model: string): string {
+  return isOpenAIModel(model) ? 'OpenAI' : 'Anthropic'
 }
 type Props = {
   onClose: (result?: string, options?: {
@@ -372,6 +378,18 @@ function OverviewTab({
   const modelEntries = Object.entries(stats.modelUsage).sort(([, a], [, b]) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
   const favoriteModel = modelEntries[0];
   const totalTokens = modelEntries.reduce((sum, [, usage]) => sum + usage.inputTokens + usage.outputTokens, 0);
+  const totalCost = modelEntries.reduce((sum, [, usage]) => sum + usage.costUSD, 0);
+  const providerCosts = modelEntries.reduce((acc, [model, usage]) => {
+    if (isOpenAIModel(model)) {
+      acc.openai += usage.costUSD;
+    } else {
+      acc.anthropic += usage.costUSD;
+    }
+    return acc;
+  }, {
+    anthropic: 0,
+    openai: 0
+  });
 
   // Memoize the factoid so it doesn't change when switching tabs
   const factoid = useMemo(() => generateFunFactoid(stats, totalTokens), [stats, totalTokens]);
@@ -445,12 +463,28 @@ function OverviewTab({
               <Text color="claude" bold>
                 {renderModelName(favoriteModel[0])}
               </Text>
+              <Text color="subtle"> · {getProviderLabel(favoriteModel[0])}</Text>
             </Text>}
         </Box>
         <Box flexDirection="column" width={28}>
           <Text wrap="truncate">
+            Total cost:{' '}
+            <Text color="claude">{formatCost(totalCost)}</Text>
+          </Text>
+        </Box>
+      </Box>
+      <Box flexDirection="row" gap={4} marginBottom={1}>
+        <Box flexDirection="column" width={28}>
+          <Text wrap="truncate">
             Total tokens:{' '}
             <Text color="claude">{formatNumber(totalTokens)}</Text>
+          </Text>
+        </Box>
+        <Box flexDirection="column" width={28}>
+          <Text wrap="truncate">
+            GPT spend:{' '}
+            <Text color="claude">{formatCost(providerCosts.openai)}</Text>
+            <Text color="subtle"> · Claude: {formatCost(providerCosts.anthropic)}</Text>
           </Text>
         </Box>
       </Box>
@@ -838,95 +872,25 @@ type ModelEntryProps = {
     inputTokens: number;
     outputTokens: number;
     cacheReadInputTokens: number;
+    costUSD: number;
   };
   totalTokens: number;
 };
 function ModelEntry(t0) {
-  const $ = _c(21);
   const {
     model,
     usage,
     totalTokens
   } = t0;
   const modelTokens = usage.inputTokens + usage.outputTokens;
-  const t1 = modelTokens / totalTokens * 100;
-  let t2;
-  if ($[0] !== t1) {
-    t2 = t1.toFixed(1);
-    $[0] = t1;
-    $[1] = t2;
-  } else {
-    t2 = $[1];
-  }
-  const percentage = t2;
-  let t3;
-  if ($[2] !== model) {
-    t3 = renderModelName(model);
-    $[2] = model;
-    $[3] = t3;
-  } else {
-    t3 = $[3];
-  }
-  let t4;
-  if ($[4] !== t3) {
-    t4 = <Text bold={true}>{t3}</Text>;
-    $[4] = t3;
-    $[5] = t4;
-  } else {
-    t4 = $[5];
-  }
-  let t5;
-  if ($[6] !== percentage) {
-    t5 = <Text color="subtle">({percentage}%)</Text>;
-    $[6] = percentage;
-    $[7] = t5;
-  } else {
-    t5 = $[7];
-  }
-  let t6;
-  if ($[8] !== t4 || $[9] !== t5) {
-    t6 = <Text>{figures.bullet} {t4}{" "}{t5}</Text>;
-    $[8] = t4;
-    $[9] = t5;
-    $[10] = t6;
-  } else {
-    t6 = $[10];
-  }
-  let t7;
-  if ($[11] !== usage.inputTokens) {
-    t7 = formatNumber(usage.inputTokens);
-    $[11] = usage.inputTokens;
-    $[12] = t7;
-  } else {
-    t7 = $[12];
-  }
-  let t8;
-  if ($[13] !== usage.outputTokens) {
-    t8 = formatNumber(usage.outputTokens);
-    $[13] = usage.outputTokens;
-    $[14] = t8;
-  } else {
-    t8 = $[14];
-  }
-  let t9;
-  if ($[15] !== t7 || $[16] !== t8) {
-    t9 = <Text color="subtle">{"  "}In: {t7} · Out:{" "}{t8}</Text>;
-    $[15] = t7;
-    $[16] = t8;
-    $[17] = t9;
-  } else {
-    t9 = $[17];
-  }
-  let t10;
-  if ($[18] !== t6 || $[19] !== t9) {
-    t10 = <Box flexDirection="column">{t6}{t9}</Box>;
-    $[18] = t6;
-    $[19] = t9;
-    $[20] = t10;
-  } else {
-    t10 = $[20];
-  }
-  return t10;
+  const percentage = (modelTokens / totalTokens * 100).toFixed(1);
+  const provider = getProviderLabel(model);
+  const costText = formatCost(usage.costUSD);
+  return <Box flexDirection="column">
+      <Text>{figures.bullet} <Text bold={true}>{renderModelName(model)}</Text>{" "}<Text color="subtle">({percentage}%)</Text></Text>
+      <Text color="subtle">{"  "}In: {formatNumber(usage.inputTokens)} · Out: {formatNumber(usage.outputTokens)}</Text>
+      <Text color="subtle">{"  "}Provider: {provider} · Cost: {costText}</Text>
+    </Box>;
 }
 type ChartLegend = {
   model: string;
@@ -1130,11 +1094,25 @@ function renderOverviewToAnsi(stats: ClaudeCodeStats): string[] {
   const modelEntries = Object.entries(stats.modelUsage).sort(([, a], [, b]) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
   const favoriteModel = modelEntries[0];
   const totalTokens = modelEntries.reduce((sum, [, usage]) => sum + usage.inputTokens + usage.outputTokens, 0);
+  const totalCost = modelEntries.reduce((sum, [, usage]) => sum + usage.costUSD, 0);
+  const providerCosts = modelEntries.reduce((acc, [model, usage]) => {
+    if (isOpenAIModel(model)) {
+      acc.openai += usage.costUSD;
+    } else {
+      acc.anthropic += usage.costUSD;
+    }
+    return acc;
+  }, {
+    anthropic: 0,
+    openai: 0
+  });
 
   // Row 1: Favorite model | Total tokens
   if (favoriteModel) {
-    lines.push(row('Favorite model', renderModelName(favoriteModel[0]), 'Total tokens', formatNumber(totalTokens)));
+    lines.push(row('Favorite model', `${renderModelName(favoriteModel[0])} (${getProviderLabel(favoriteModel[0])})`, 'Total cost', formatCost(totalCost)));
   }
+  lines.push('');
+  lines.push(row('Total tokens', formatNumber(totalTokens), 'GPT spend', `${formatCost(providerCosts.openai)} (Claude ${formatCost(providerCosts.anthropic)})`));
   lines.push('');
 
   // Row 2: Sessions | Longest session
@@ -1197,6 +1175,18 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
   }
   const favoriteModel = modelEntries[0];
   const totalTokens = modelEntries.reduce((sum, [, usage]) => sum + usage.inputTokens + usage.outputTokens, 0);
+  const totalCost = modelEntries.reduce((sum, [, usage]) => sum + usage.costUSD, 0);
+  const providerCosts = modelEntries.reduce((acc, [model, usage]) => {
+    if (isOpenAIModel(model)) {
+      acc.openai += usage.costUSD;
+    } else {
+      acc.anthropic += usage.costUSD;
+    }
+    return acc;
+  }, {
+    anthropic: 0,
+    openai: 0
+  });
 
   // Generate chart if we have data - use fixed width for screenshot
   const chartOutput = generateTokenChart(stats.dailyModelTokens, modelEntries.map(([model]) => model), 80 // Fixed width for screenshot
@@ -1212,7 +1202,8 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
   }
 
   // Summary
-  lines.push(`${figures.star} Favorite: ${chalk.magenta.bold(renderModelName(favoriteModel?.[0] || ''))} · ${figures.circle} Total: ${chalk.magenta(formatNumber(totalTokens))} tokens`);
+  lines.push(`${figures.star} Favorite: ${chalk.magenta.bold(renderModelName(favoriteModel?.[0] || ''))} (${getProviderLabel(favoriteModel?.[0] || '')}) · ${figures.circle} Total: ${chalk.magenta(formatNumber(totalTokens))} tokens · ${chalk.magenta(formatCost(totalCost))}`);
+  lines.push(chalk.gray(`GPT spend: ${formatCost(providerCosts.openai)} · Claude spend: ${formatCost(providerCosts.anthropic)}`));
   lines.push('');
 
   // Model breakdown - only show top 3 for screenshot
@@ -1220,8 +1211,8 @@ function renderModelsToAnsi(stats: ClaudeCodeStats): string[] {
   for (const [model, usage] of topModels) {
     const modelTokens = usage.inputTokens + usage.outputTokens;
     const percentage = (modelTokens / totalTokens * 100).toFixed(1);
-    lines.push(`${figures.bullet} ${chalk.bold(renderModelName(model))} ${chalk.gray(`(${percentage}%)`)}`);
-    lines.push(chalk.dim(`  In: ${formatNumber(usage.inputTokens)} · Out: ${formatNumber(usage.outputTokens)}`));
+    lines.push(`${figures.bullet} ${chalk.bold(renderModelName(model))} ${chalk.gray(`(${percentage}%)`)} ${chalk.gray(`[${getProviderLabel(model)}]`)}`);
+    lines.push(chalk.dim(`  In: ${formatNumber(usage.inputTokens)} · Out: ${formatNumber(usage.outputTokens)} · Cost: ${formatCost(usage.costUSD)}`));
   }
   return lines;
 }

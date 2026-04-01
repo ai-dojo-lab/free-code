@@ -1,11 +1,12 @@
 import type { ChildProcess, ExecFileException } from 'child_process'
 import { execFile, spawn } from 'child_process'
+import { existsSync } from 'fs'
 import memoize from 'lodash-es/memoize.js'
 import { homedir } from 'os'
 import * as path from 'path'
 import { logEvent } from 'src/services/analytics/index.js'
 import { fileURLToPath } from 'url'
-import { isInBundledMode } from './bundledMode.js'
+import { isInBundledMode, isRunningWithBun } from './bundledMode.js'
 import { logForDebugging } from './debug.js'
 import { isEnvDefinedFalsy } from './envUtils.js'
 import { execFileNoThrow } from './execFileNoThrow.js'
@@ -60,6 +61,18 @@ const getRipgrepConfig = memoize((): RipgrepConfig => {
     process.platform === 'win32'
       ? path.resolve(rgRoot, `${process.arch}-win32`, 'rg.exe')
       : path.resolve(rgRoot, `${process.arch}-${process.platform}`, 'rg')
+
+  // In compiled/native Bun builds, vendor ripgrep may not exist on disk because
+  // the executable is embedded into Bun itself. If the vendored path is missing
+  // but we are running on Bun, fall back to argv0 dispatch against process.execPath.
+  if (!existsSync(command) && isRunningWithBun()) {
+    return {
+      mode: 'embedded',
+      command: process.execPath,
+      args: ['--no-config'],
+      argv0: 'rg',
+    }
+  }
 
   return { mode: 'builtin', command, args: [] }
 })

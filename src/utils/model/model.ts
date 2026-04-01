@@ -348,6 +348,12 @@ export function renderModelSetting(setting: ModelName | ModelAlias): string {
  */
 export function getPublicModelDisplayName(model: ModelName): string | null {
   switch (model) {
+    case 'gpt-5':
+      return 'GPT-5'
+    case 'gpt-5-mini':
+      return 'GPT-5 mini'
+    case 'gpt-4.1':
+      return 'GPT-4.1'
     case getModelStrings().opus46:
       return 'Opus 4.6'
     case getModelStrings().opus46 + '[1m]':
@@ -379,6 +385,14 @@ export function getPublicModelDisplayName(model: ModelName): string | null {
     case getModelStrings().haiku35:
       return 'Haiku 3.5'
     default:
+      if (model.startsWith('gpt-')) {
+        return model
+          .split('-')
+          .map((part, index) =>
+            index === 0 ? part.toUpperCase() : part === 'mini' ? 'mini' : part,
+          )
+          .join('-')
+      }
       return null
   }
 }

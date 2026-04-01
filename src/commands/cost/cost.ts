@@ -2,8 +2,19 @@ import { formatTotalCost } from '../../cost-tracker.js'
 import { currentLimits } from '../../services/claudeAiLimits.js'
 import type { LocalCommandCall } from '../../types/command.js'
 import { isClaudeAISubscriber } from '../../utils/auth.js'
+import { getMainLoopModel } from '../../utils/model/model.js'
+import { isOpenAIModel } from '../../services/openai/client.js'
 
 export const call: LocalCommandCall = async () => {
+  if (isOpenAIModel(getMainLoopModel())) {
+    return {
+      type: 'text',
+      value:
+        'Current session is using ChatGPT / OpenAI pricing.\n\n' +
+        formatTotalCost(),
+    }
+  }
+
   if (isClaudeAISubscriber()) {
     let value: string
 

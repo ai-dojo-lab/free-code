@@ -32,6 +32,11 @@ import {
 } from './model.js'
 import { has1mContext } from '../context.js'
 import { getGlobalConfig } from '../config.js'
+import {
+  getAvailableOpenAIModels,
+  hasOpenAIChatGPTAuth,
+} from '../openaiAuth.js'
+import { isOpenAIModel } from '../../services/openai/client.js'
 
 // @[MODEL LAUNCH]: Update all the available and default model option strings below.
 
@@ -266,6 +271,23 @@ function getOpusPlanOption(): ModelOption {
   }
 }
 
+function getOpenAIModelOptions(): ModelOption[] {
+  if (!hasOpenAIChatGPTAuth()) {
+    return []
+  }
+
+  const models = getAvailableOpenAIModels()
+  const fallbackModels = ['gpt-5', 'gpt-5-mini', 'gpt-4.1']
+  const ids = (models.length > 0 ? models : fallbackModels).filter(Boolean)
+
+  return ids.map(model => ({
+    value: model,
+    label: model,
+    description: 'ChatGPT model',
+    descriptionForModel: `ChatGPT model (${model})`,
+  }))
+}
+
 // @[MODEL LAUNCH]: Update the model picker lists below to include/reorder options for the new model.
 // Each user tier (ant, Max/Team Premium, Pro/Team Standard/Enterprise, PAYG 1P, PAYG 3P) has its own list.
 function getModelOptionsBase(fastMode = false): ModelOption[] {
@@ -459,7 +481,7 @@ function getKnownModelOption(model: string): ModelOption | null {
 }
 
 export function getModelOptions(fastMode = false): ModelOption[] {
-  const options = getModelOptionsBase(fastMode)
+  const options = [...getModelOptionsBase(fastMode), ...getOpenAIModelOptions()]
 
   // Add the custom model from the ANTHROPIC_CUSTOM_MODEL_OPTION env var
   const envCustomModel = process.env.ANTHROPIC_CUSTOM_MODEL_OPTION
@@ -493,6 +515,11 @@ export function getModelOptions(fastMode = false): ModelOption[] {
   } else if (initialMainLoopModel !== null) {
     customModel = initialMainLoopModel
   }
+
+  if (customModel !== null && isOpenAIModel(customModel) && !hasOpenAIChatGPTAuth()) {
+    return filterModelOptionsByAllowlist(options)
+  }
+
   if (customModel === null || options.some(opt => opt.value === customModel)) {
     return filterModelOptionsByAllowlist(options)
   } else if (customModel === 'opusplan') {

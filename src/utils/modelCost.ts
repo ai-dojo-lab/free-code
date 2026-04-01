@@ -86,7 +86,50 @@ export const COST_HAIKU_45 = {
   webSearchRequests: 0.01,
 } as const satisfies ModelCosts
 
+// OpenAI standard pricing: https://developers.openai.com/api/docs/pricing
+export const COST_GPT_5 = {
+  inputTokens: 1.25,
+  outputTokens: 10,
+  promptCacheWriteTokens: 0,
+  promptCacheReadTokens: 0.125,
+  webSearchRequests: 0.01,
+} as const satisfies ModelCosts
+
+export const COST_GPT_5_MINI = {
+  inputTokens: 0.25,
+  outputTokens: 2,
+  promptCacheWriteTokens: 0,
+  promptCacheReadTokens: 0.025,
+  webSearchRequests: 0.01,
+} as const satisfies ModelCosts
+
+export const COST_GPT_4_1 = {
+  inputTokens: 2,
+  outputTokens: 8,
+  promptCacheWriteTokens: 0,
+  promptCacheReadTokens: 0.5,
+  webSearchRequests: 0.025,
+} as const satisfies ModelCosts
+
 const DEFAULT_UNKNOWN_MODEL_COST = COST_TIER_5_25
+
+function inferOpenAIModelCosts(model: string): ModelCosts | undefined {
+  const normalized = model.toLowerCase()
+
+  if (normalized.includes('gpt-5-mini')) {
+    return COST_GPT_5_MINI
+  }
+
+  if (normalized.includes('gpt-4.1')) {
+    return COST_GPT_4_1
+  }
+
+  if (normalized.includes('gpt-5')) {
+    return COST_GPT_5
+  }
+
+  return undefined
+}
 
 /**
  * Get the cost tier for Opus 4.6 based on fast mode.
@@ -123,6 +166,9 @@ export const MODEL_COSTS: Record<ModelShortName, ModelCosts> = {
     COST_TIER_5_25,
   [firstPartyNameToCanonical(CLAUDE_OPUS_4_6_CONFIG.firstParty)]:
     COST_TIER_5_25,
+  'gpt-5': COST_GPT_5,
+  'gpt-5-mini': COST_GPT_5_MINI,
+  'gpt-4.1': COST_GPT_4_1,
 }
 
 /**
@@ -153,14 +199,21 @@ export function getModelCosts(model: string, usage: Usage): ModelCosts {
   }
 
   const costs = MODEL_COSTS[shortName]
-  if (!costs) {
-    trackUnknownModelCost(model, shortName)
-    return (
-      MODEL_COSTS[getCanonicalName(getDefaultMainLoopModelSetting())] ??
-      DEFAULT_UNKNOWN_MODEL_COST
-    )
+  if (costs) {
+    return costs
   }
-  return costs
+
+  const inferredOpenAICosts = inferOpenAIModelCosts(model)
+  if (inferredOpenAICosts) {
+    trackUnknownModelCost(model, shortName)
+    return inferredOpenAICosts
+  }
+
+  trackUnknownModelCost(model, shortName)
+  return (
+    MODEL_COSTS[getCanonicalName(getDefaultMainLoopModelSetting())] ??
+    DEFAULT_UNKNOWN_MODEL_COST
+  )
 }
 
 function trackUnknownModelCost(model: string, shortName: ModelShortName): void {
@@ -225,7 +278,7 @@ export function formatModelPricing(costs: ModelCosts): string {
  */
 export function getModelPricingString(model: string): string | undefined {
   const shortName = getCanonicalName(model)
-  const costs = MODEL_COSTS[shortName]
+  const costs = MODEL_COSTS[shortName] ?? inferOpenAIModelCosts(model)
   if (!costs) return undefined
   return formatModelPricing(costs)
 }

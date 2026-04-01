@@ -255,6 +255,8 @@ import {
   type RetryContext,
   withRetry,
 } from './withRetry.js'
+import { queryOpenAIModel } from './openai.js'
+import { isOpenAIModel } from '../openai/client.js'
 
 // Define a type that represents valid JSON values
 type JsonValue = string | number | boolean | null | JsonObject | JsonArray
@@ -1025,6 +1027,26 @@ async function* queryModel(
   StreamEvent | AssistantMessage | SystemAPIErrorMessage,
   void
 > {
+  if (isOpenAIModel(options.model)) {
+    yield* queryOpenAIModel({
+      messages,
+      systemPrompt,
+      thinkingConfig,
+      tools,
+      signal,
+      options: {
+        model: options.model,
+        querySource: options.querySource,
+        agents: options.agents,
+        allowedAgentTypes: options.allowedAgentTypes,
+        getToolPermissionContext: options.getToolPermissionContext,
+        queryTracking: options.queryTracking,
+        fastMode: options.fastMode,
+      },
+    })
+    return
+  }
+
   // Check cheap conditions first — the off-switch await blocks on GrowthBook
   // init (~10ms). For non-Opus models (haiku, sonnet) this skips the await
   // entirely. Subscribers don't hit this path at all.

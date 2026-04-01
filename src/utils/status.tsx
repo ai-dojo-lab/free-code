@@ -10,10 +10,13 @@ import { getAWSRegion, getDefaultVertexRegion, isEnvTruthy } from './envUtils.js
 import { getDisplayPath } from './file.js';
 import { formatNumber } from './format.js';
 import { getIdeClientName, type IDEExtensionInstallationStatus, isJetBrainsIde, toIDEDisplayName } from './ide.js';
-import { getClaudeAiUserDefaultModelDescription, modelDisplayString } from './model/model.js';
+import { getClaudeAiUserDefaultModelDescription, getMainLoopModel, modelDisplayString } from './model/model.js';
 import { getAPIProvider } from './model/providers.js';
+import { formatCost, getProviderCostBreakdown, getTotalCost } from '../cost-tracker.js';
 import { getMTLSConfig } from './mtls.js';
 import { checkInstall } from './nativeInstaller/index.js';
+import { isOpenAIModel } from '../services/openai/client.js';
+import { getOpenAIAccountInfo } from './openaiAuth.js';
 import { getProxyUrl } from './proxy.js';
 import { SandboxManager } from './sandbox/sandbox-adapter.js';
 import { getSettingsWithAllErrors } from './settings/allErrors.js';
@@ -198,6 +201,28 @@ export async function buildInstallationHealthDiagnostics(): Promise<Diagnostic[]
   return items;
 }
 export function buildAccountProperties(): Property[] {
+  const currentModel = getMainLoopModel();
+  if (isOpenAIModel(currentModel)) {
+    const accountInfo = getOpenAIAccountInfo();
+    const properties: Property[] = [{
+      label: 'Login method',
+      value: 'ChatGPT Account'
+    }];
+    if (accountInfo?.accountId) {
+      properties.push({
+        label: 'Account ID',
+        value: accountInfo.accountId
+      });
+    }
+    if (accountInfo?.email && !process.env.IS_DEMO) {
+      properties.push({
+        label: 'Email',
+        value: accountInfo.email
+      });
+    }
+    return properties;
+  }
+
   const accountInfo = getAccountInformation();
   if (!accountInfo) {
     return [];
@@ -238,6 +263,13 @@ export function buildAccountProperties(): Property[] {
   return properties;
 }
 export function buildAPIProviderProperties(): Property[] {
+  const currentModel = getMainLoopModel();
+  if (isOpenAIModel(currentModel)) {
+    return [{
+      label: 'API provider',
+      value: 'OpenAI (ChatGPT)'
+    }];
+  }
   const apiProvider = getAPIProvider();
   const properties: Property[] = [];
   if (apiProvider !== 'firstParty') {
@@ -350,6 +382,23 @@ export function buildAPIProviderProperties(): Property[] {
     }
   }
   return properties;
+}
+export function buildCostSummaryProperties(): Property[] {
+  const totalCost = getTotalCost();
+  if (totalCost <= 0) {
+    return [];
+  }
+  const breakdown = getProviderCostBreakdown();
+  return [{
+    label: 'Session cost',
+    value: formatCost(totalCost)
+  }, {
+    label: 'Anthropic subtotal',
+    value: formatCost(breakdown.anthropic)
+  }, {
+    label: 'OpenAI subtotal',
+    value: formatCost(breakdown.openai)
+  }];
 }
 export function getModelDisplayLabel(mainLoopModel: string | null): string {
   let modelLabel = modelDisplayString(mainLoopModel);
