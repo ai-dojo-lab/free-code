@@ -13,7 +13,10 @@ export const OPENAI_OAUTH_CALLBACK_PORT = 1455
 export const OPENAI_CODEX_CLIENT_VERSION =
   process.env.OPENAI_CODEX_CLIENT_VERSION ?? '0.111.0'
 export const OPENAI_OAUTH_SCOPE =
-  'openid profile email offline_access api.connectors.read api.connectors.invoke'
+  process.env.OPENAI_OAUTH_SCOPE ??
+  'openid profile email offline_access'
+export const OPENAI_CODEX_ORIGINATOR =
+  process.env.OPENAI_CODEX_ORIGINATOR ?? 'pi'
 
 function formBody(values: Record<string, string>): string {
   const params = new URLSearchParams()
@@ -103,7 +106,7 @@ export function buildChatGPTAuthUrl({
   authUrl.searchParams.set('id_token_add_organizations', 'true')
   authUrl.searchParams.set('codex_cli_simplified_flow', 'true')
   authUrl.searchParams.set('state', state)
-  authUrl.searchParams.set('originator', 'codex_cli_rs')
+  authUrl.searchParams.set('originator', OPENAI_CODEX_ORIGINATOR)
   return authUrl.toString()
 }
 
